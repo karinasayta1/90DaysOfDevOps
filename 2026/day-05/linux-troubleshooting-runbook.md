@@ -1,6 +1,6 @@
-# Linux Troubleshooting Runbook – SSH Service
+# Linux Troubleshooting Runbook – Cron Service
 
-This runbook provides quick troubleshooting steps if the SSH service goes down.
+This runbook provides quick troubleshooting steps for the cron service.
 
 ---
 
@@ -11,9 +11,20 @@ This runbook provides quick troubleshooting steps if the SSH service goes down.
 `uname -a`
 
 **Output:**
-Linux afroz 6.14.0-37-generic #37~24.04.1-Ubuntu SMP PREEMPT_DYNAMIC Thu Nov 20 10:25:38 UTC x86_64 x86_64 x86_64 GNU/Linux
+Linux ip-172-31-44-197 7.0.0-1004-aws x86_64 GNU/Linux
 
 **Observation:** Kernel version and architecture confirmed.
+
+---
+
+### Command:
+
+`uname -r`
+
+**Output:**
+7.0.0-1004-aws
+
+**Observation:** Confirms kernel version.
 
 ---
 
@@ -22,10 +33,9 @@ Linux afroz 6.14.0-37-generic #37~24.04.1-Ubuntu SMP PREEMPT_DYNAMIC Thu Nov 20 
 `cat /etc/os-release`
 
 **Output:**
-PRETTY_NAME="Ubuntu 24.04.3 LTS"
-VERSION="24.04.3 LTS (Noble Numbat)"
+Ubuntu 26.04 LTS
 
-**Observation:** Confirms distribution and OS version.
+**Observation:** Confirms OS distribution and version.
 
 ---
 
@@ -41,9 +51,12 @@ VERSION="24.04.3 LTS (Noble Numbat)"
 
 ### Command:
 
-`cp /etc/hosts /tmp/runbook-demo/hosts-copy && ls -l /tmp/runbook-demo`
+`cp /etc/crontab /tmp/runbook-demo/crontab-copy && ls -l /tmp/runbook-demo`
 
-**Observation:** File copied successfully. Filesystem is writable.
+**Output:**
+crontab-copy present in directory
+
+**Observation:** File copied successfully, filesystem is writable.
 
 ---
 
@@ -51,13 +64,20 @@ VERSION="24.04.3 LTS (Noble Numbat)"
 
 ### Command:
 
-`ps -o pid,pcpu,pmem,comm -p $(pidof sshd)`
+`top`
+
+**Observation:** CPU idle ~100%, system load very low.
+
+---
+
+### Command:
+
+`ps -o pid,pcpu,pmem,comm -C cron`
 
 **Output:**
-PID %CPU %MEM COMMAND
-1415  0.0  0.0 sshd
+PID 584, CPU 0.0%, MEM 0.3%
 
-**Observation:** SSH process running with negligible CPU and memory usage.
+**Observation:** cron process running with minimal resource usage.
 
 ---
 
@@ -66,9 +86,9 @@ PID %CPU %MEM COMMAND
 `free -h`
 
 **Output:**
-Total: 7.7G, Used: 2.3G, Available: 5.4G
+Total: ~908MB, Used: ~313MB, Free: ~400MB
 
-**Observation:** Sufficient memory available.
+**Observation:** Memory usage normal, no swap usage.
 
 ---
 
@@ -79,22 +99,20 @@ Total: 7.7G, Used: 2.3G, Available: 5.4G
 `df -h`
 
 **Output:**
-/dev/sdb4 496G 15G 457G 3% /
+Root filesystem ~31% used
 
-**Observation:** Root partition has more than 90% free space.
+**Observation:** Sufficient disk space available.
 
 ---
 
 ### Command:
 
-`iostat`
+`sudo du -sh /var/log`
 
-**Observation:**
+**Output:**
+18M /var/log
 
-* CPU idle ~84% (healthy)
-* iowait ~3% (low)
-* system ~2.9% (low)
-* user ~9–10% (normal workload)
+**Observation:** Log size is small and healthy.
 
 ---
 
@@ -102,23 +120,23 @@ Total: 7.7G, Used: 2.3G, Available: 5.4G
 
 ### Command:
 
-`sudo ss -tulpn | grep sshd`
+`ss -tulnp`
 
 **Output:**
-Port 22 is in LISTEN state
+Port 22 (SSH) is listening
 
-**Observation:** SSH is actively listening on port 22.
+**Observation:** cron does not expose network ports (expected behavior).
 
 ---
 
 ### Command:
 
-`nc -zv localhost 22`
+`ping -c 3 google.com`
 
 **Output:**
-Connection succeeded
+0% packet loss
 
-**Observation:** SSH connectivity confirmed.
+**Observation:** Network connectivity is working fine.
 
 ---
 
@@ -126,42 +144,60 @@ Connection succeeded
 
 ### Command:
 
-`journalctl -u ssh -n 50`
+`journalctl -u cron -n 10`
 
-**Observation:** No errors or warnings; normal authentication logs.
+**Output:**
+CRON jobs executing (echo command visible)
+
+**Observation:** cron service is active and running scheduled jobs.
+
+---
+
+## Cron Validation Test
+
+### Command:
+
+`crontab -e`
+
+Added:
+`* * * * * echo "cron working" >> /tmp/cron-test.log`
 
 ---
 
 ### Command:
 
-`tail -n 50 /var/log/auth.log`
+`cat /tmp/cron-test.log`
 
-**Observation:** Recent login activity looks normal, no suspicious entries.
+**Output:**
+cron working
+cron working
+
+**Observation:** File updates every minute confirming cron is working correctly.
 
 ---
 
 ## Quick Review
 
-* SSH service running normally
+* cron service running normally
 * CPU and memory usage low
 * Disk space sufficient
-* Port 22 is open and accessible
-* Logs show no errors
+* Network working fine
+* Logs confirm cron jobs execution
+* Manual cron test successful
 
 ---
 
 ## If This Worsens
 
-1. Check logs again for errors:
-   `journalctl -u ssh`
+1. Check logs again:
+   `journalctl -u cron`
 
-2. Monitor system resources:
-   CPU / Memory / Disk
+2. Verify cron jobs:
+   `crontab -l`
 
-3. Restart SSH service:
-   `systemctl restart ssh`
+3. Restart cron service:
+   `systemctl restart cron`
 
-4. Verify port conflicts:
-   Check if port 22 is used by another service
+4. Debug cron jobs manually
 
 ---
